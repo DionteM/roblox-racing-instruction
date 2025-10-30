@@ -1,6 +1,6 @@
-# 🏎️ AI Kart Driver Script - Instructions for Beginners
+# AIDriverScript - Pseudocode
 
-## 📋 Part 1: Initial Setup
+## Part 1: Init
 
 1. At the very top of your script, add a wait command:
    ```lua
@@ -17,7 +17,7 @@
 
 ---
 
-## 🎮 Part 2: Get Game Services
+## 🎮 Part 2: Serivces
 
 6. Create a variable called `Teams` and use `game:GetService("Teams")` to get the Teams service
 
@@ -25,7 +25,7 @@
 
 ---
 
-## 👥 Part 3: Find the Team
+## 👥 Part 3: Teams
 
 8. Create a variable called `driverName` and set it to `Driver.Name`
 
@@ -51,7 +51,7 @@
 
 ---
 
-## 🏎️ Part 4: Find the Kart
+## 🏎️ Part 4: Kart
 
 14. Create a variable called `kartName` and set it to `teamName .. "Kart"`
 
@@ -66,7 +66,7 @@
 
 ---
 
-## ⚙️ Part 5: Get Kart Parts
+## ⚙️ Part 5: Kart's Parts
 
 18. Create a variable called `RearRightDrivingHinge` and use `Kart:WaitForChild("RearRightDrivingHinge")`
 
@@ -86,7 +86,7 @@
 
 ---
 
-## 🛞 Part 6: Find All Tire Colliders
+## 🛞 Part 6: Tires
 
 26. Create an empty table called `TireColliders` using `{}`
 
@@ -98,7 +98,7 @@
 
 ---
 
-## 🚩 Part 7: Find and Sort Checkpoints
+## 🚩 Part 7: Checkpoints
 
 28. Create an empty table called `Checkpoints` using `{}`
 
@@ -156,7 +156,7 @@
 
 ---
 
-## 📊 Part 9: Create State Objects
+## 📊 Part 9: Instance Attributes
 
 34. Create a `StringValue` object:
     - Use `Instance.new("StringValue")`
@@ -180,7 +180,7 @@
 
 ---
 
-## 📦 Part 10: Create Data Tables
+## 📦 Part 10: Data Tables
 
 37. **Copy and paste these data tables:**
     ```lua
@@ -224,7 +224,7 @@
 
 ---
 
-## 🔢 Part 11: Tracking Variables
+## 🔢 Part 11: Tracked Variables
 
 38. Create a variable called `currentCheckpointIndex` and set it to `1`
 
@@ -596,7 +596,7 @@
 
 ---
 
-## 🚗 Part 18: Main Driving Function
+## 🚗 Part 18: Main Function
 
 > **Note:** This function is very complex! Your teacher will help you understand it or provide the code.
 
@@ -670,11 +670,3 @@
 ---
 
 ## 🎉 You're Done!
-
-Your AI kart driver is now ready to race! Make sure you have:
-- ✅ All the detectors in the kart
-- ✅ Checkpoints numbered properly in the workspace
-- ✅ The driver model set up correctly
-- ✅ Teams configured with matching names
-
-**Good luck racing!** 🏁
