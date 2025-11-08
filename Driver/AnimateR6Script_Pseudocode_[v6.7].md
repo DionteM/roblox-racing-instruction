@@ -1,4 +1,4 @@
-                                                                                                                                                                            # AnimateR6Script - Pseudocode
+# AnimateR6Script - Pseudocode
 ```lua
 -- humanoidAnimatePlayEmote.lua
 
