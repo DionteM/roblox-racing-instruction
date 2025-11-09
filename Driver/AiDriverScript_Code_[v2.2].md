@@ -1,4 +1,4 @@
-# AIDriverScript - Pseudocode
+# AIDriverScript - Code
 
 ```lua
 -- AI Kart Driver Script - Main Controller
@@ -764,3 +764,4 @@ while true do
 	task.wait(0.05)
 end
 ```
+
