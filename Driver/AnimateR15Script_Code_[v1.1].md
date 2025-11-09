@@ -1,4 +1,4 @@
-# AnimateR15Script - Pseudocode
+# AnimateR15Script - Code
 ```lua
 -- humanoidAnimateR15Moods.lua
 
