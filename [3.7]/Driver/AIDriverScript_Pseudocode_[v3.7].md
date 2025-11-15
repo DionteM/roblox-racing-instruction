@@ -600,7 +600,205 @@
 
 > **Note:** This function is very complex! Your teacher will help you understand it or provide the code.
 
-61. **Skip this part - your teacher will provide the `updateDriving()` function**
+61. **Skip this part - here's the provided `updateDriving()` function**
+```lua
+-- Main driving update
+local function updateDriving()
+	if not isSeated then return false end
+
+	local nextCheckpoint = Checkpoints[currentCheckpointIndex]
+	local nextCheckpointNumber = getEffectiveCheckpointNumber(currentCheckpointIndex)
+
+	local steeringAngle = 0
+	local speedReduction = 0
+	local targetSpeed = Config.NORMAL_SPEED
+	local currentSpeed = getSpeed()
+
+	-- Check for reverse conditions (highest priority)
+	if currentSpeed < Config.REVERSE_SPEED_THRESHOLD then
+		if ReverseData.lowSpeedStartTime == 0 then
+			ReverseData.lowSpeedStartTime = tick()
+		elseif not ReverseData.isActive and (tick() - ReverseData.lowSpeedStartTime) >= Config.REVERSE_TIME_THRESHOLD then
+			-- Activate reverse
+			ReverseData.isActive = true
+			ReverseData.startTime = tick()
+			setState("Reverse", "stuck at low speed")
+			chat(getRandomMessage("Stuck"))
+		end
+	else
+		ReverseData.lowSpeedStartTime = 0
+	end
+
+	-- REVERSE STATE (highest priority)
+	if ReverseData.isActive then
+		local reverseElapsed = tick() - ReverseData.startTime
+
+		if reverseElapsed < Config.REVERSE_DURATION then
+			-- Still reversing
+			setState("Reverse", "backing up")
+
+			-- Invert steering and reverse
+			local forwardAngle = calculateSteeringAngle(nextCheckpoint.Position)
+			steeringAngle = -forwardAngle -- Invert steering
+
+			-- Set reverse speed
+			RearRightDrivingHinge.AngularVelocity = Config.REVERSE_SPEED -- Positive for reverse
+			RearLeftDrivingHinge.AngularVelocity = Config.REVERSE_SPEED
+			RearRightDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
+			RearLeftDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
+
+			steer(steeringAngle)
+			return true
+		else
+			-- Done reversing
+			ReverseData.isActive = false
+			ReverseData.lowSpeedStartTime = 0
+			chat("Back in action!")
+		end
+	end
+
+	-- State priority: Avoid > Drift > Dodge > Dive > Pursuit > Chaining > Default
+
+	if AvoidData.side then
+		-- AVOID STATE
+		setState("Avoid", "avoiding")
+		local baseAngle = calculateSteeringAngle(nextCheckpoint.Position)
+		local correction = AvoidData.correction
+
+		if AvoidData.side == "Left" then
+			steeringAngle = baseAngle + correction
+		elseif AvoidData.side == "Right" then
+			steeringAngle = baseAngle - correction
+		end
+
+		local speedFactor = currentSpeed / Config.NORMAL_SPEED
+		speedReduction = correction * speedFactor * 0.5
+
+	elseif DriftData.isActive then
+		-- DRIFT STATE (no checkpoint contact)
+		setState("Drift", "drifting")
+		steeringAngle = calculateSteeringAngle(nextCheckpoint.Position)
+		-- No steering purchase in drift
+
+	elseif DodgeData.isActive then
+		-- DODGE STATE
+		setState("Dodge", "dodging")
+		local baseAngle = calculateSteeringAngle(nextCheckpoint.Position)
+
+		if baseAngle > 0 then
+			steeringAngle = baseAngle + Config.DODGE_STEERING_BOOST
+		elseif baseAngle < 0 then
+			steeringAngle = baseAngle - Config.DODGE_STEERING_BOOST
+		else
+			steeringAngle = math.random(0, 1) == 1 and Config.DODGE_STEERING_BOOST or -Config.DODGE_STEERING_BOOST
+		end
+
+		speedReduction = Config.DODGE_SPEED_REDUCTION
+		DodgeData.isActive = false -- One-frame dodge
+
+	elseif DiveData.isActive and DiveData.targetKart then
+		-- DIVE STATE (copying rival's steering)
+		setState("Dive", "diving")
+		local targetSeat = DiveData.targetKart:FindFirstChild("VehicleSeat")
+
+		if targetSeat then
+			local diveDistance = (VehicleSeat.Position - targetSeat.Position).Magnitude
+			if diveDistance > Config.DIVE_MAX_DISTANCE then
+				DiveData.isActive = false
+				if DiveData.steeringConnection then
+					DiveData.steeringConnection:Disconnect()
+					DiveData.steeringConnection = nil
+				end
+				chat("Dive ended - out of range")
+			end
+		else
+			DiveData.isActive = false
+			if DiveData.steeringConnection then
+				DiveData.steeringConnection:Disconnect()
+				DiveData.steeringConnection = nil
+			end
+		end
+
+		-- Steering is handled by the PropertyChangedSignal connection
+		-- Don't override it here, just maintain current steering
+		return true
+
+	elseif PursuitData.isActive and PursuitData.targetKart then
+		-- PURSUIT STATE
+		setState("Pursuit", "pursuing")
+		local targetSeat = PursuitData.targetKart:FindFirstChild("VehicleSeat")
+
+		if targetSeat then
+			local pursuitDistance = (VehicleSeat.Position - targetSeat.Position).Magnitude
+			if pursuitDistance > Config.PURSUIT_MAX_DISTANCE then
+				PursuitData.isActive = false
+			else
+				steeringAngle = calculateSteeringAngle(targetSeat.Position)
+
+				-- Check for dive transition
+				local targetVelocity = targetSeat.AssemblyLinearVelocity
+				if targetVelocity.Magnitude > 5 then
+					local targetForward = targetSeat.CFrame.LookVector
+					local velocityDir = targetVelocity.Unit
+					local targetForward2D = Vector3.new(targetForward.X, 0, targetForward.Z).Unit
+					local velocityDir2D = Vector3.new(velocityDir.X, 0, velocityDir.Z).Unit
+					local dot = targetForward2D:Dot(velocityDir2D)
+					local turnAngle = math.deg(math.acos(math.clamp(dot, -1, 1)))
+
+					if turnAngle > Config.DIVE_TURN_ANGLE_THRESHOLD then
+						DiveData.isActive = true
+						DiveData.targetKart = PursuitData.targetKart
+						PursuitData.isActive = false
+
+						-- Connect to rival's steering to copy it
+						local rivalSteeringHinge = DiveData.targetKart:FindFirstChild("FrontRightSteeringHinge")
+						if rivalSteeringHinge then
+							DiveData.steeringConnection = rivalSteeringHinge:GetPropertyChangedSignal("UpperAngle"):Connect(function()
+								if DiveData.isActive then
+									steer(rivalSteeringHinge.UpperAngle)
+								end
+							end)
+						end
+
+						setState("Dive", "target turning sharply")
+					end
+				end
+			end
+		else
+			PursuitData.isActive = false
+		end
+
+	elseif ChainingData.isActive then
+		-- CHAINING STATE (targeting next checkpoint)
+		setState("Chaining", "chaining to next")
+		local nextIndex = currentCheckpointIndex + 1
+		if nextIndex > #Checkpoints then
+			nextIndex = 1
+		end
+		local targetCheckpoint = Checkpoints[nextIndex]
+		steeringAngle = calculateSteeringAngle(targetCheckpoint.Position)
+
+	else
+		-- DEFAULT STATE
+		setState("Default", "default navigation")
+		steeringAngle = calculateSteeringAngle(nextCheckpoint.Position)
+	end
+
+	-- Apply steering purchase (unless in drift)
+	if not DriftData.isActive then
+		local purchaseReduction
+		steeringAngle, purchaseReduction = applySteeringPurchase(steeringAngle)
+		speedReduction = speedReduction + purchaseReduction
+	end
+
+	-- Apply steering and speed
+	steer(steeringAngle)
+	setSpeed(targetSpeed - speedReduction)
+
+	return true
+end
+
+```
 
 ---
 
