@@ -1,9 +1,7 @@
-# AIDriverScript - Pseudocode
+# AIDriverScript - Code
 
 ```lua
--- AI Kart Driver Script - Main Controller
--- Place this script inside the Driver model in ServerStorage
--- Detectors (ForwardDetector, LeftDetector, RightDetector, TightForwardDetector) must already exist as children of Kart
+-- AI Kart Driver Script v3.7T
 wait(3)
 local Driver = script.Parent
 local Humanoid = Driver:WaitForChild("Humanoid")
@@ -37,20 +35,21 @@ if not Team then
 end
 
 -- Find the kart
-local kartName = teamName .. "Kart"
+local kartName = teamName .. "Buggy"
 local Kart = workspace:FindFirstChild(kartName)
 if not Kart then
 	warn("Kart not found: " .. kartName)
 	return
 end
 
-local VehicleSeat = Kart:WaitForChild("VehicleSeat")
+local VehicleSeat = Kart:WaitForChild("DriverSeat")
+
 
 -- Get kart components
-local RearRightDrivingHinge = Kart:WaitForChild("RearRightDrivingHinge")
-local RearLeftDrivingHinge = Kart:WaitForChild("RearLeftDrivingHinge")
-local FrontLeftSteeringHinge = Kart:WaitForChild("FrontLeftSteeringHinge")
-local FrontRightSteeringHinge = Kart:WaitForChild("FrontRightSteeringHinge")
+local RearRightDrivingHinge = Kart.Engine:WaitForChild("WheelRLMotor")
+local RearLeftDrivingHinge = Kart.Engine:WaitForChild("WheelRRMotor")
+local FrontLeftSteeringHinge = Kart.Steering:WaitForChild("SteeringRack")
+--local FrontRightSteeringHinge = Kart:WaitForChild("FrontRightSteeringHinge")
 
 -- Get existing detectors from kart
 local ForwardDetector = Kart:WaitForChild("ForwardDetector")
@@ -79,16 +78,16 @@ table.sort(Checkpoints, function(a, b)
 end)
 
 -- Configuration
-local randNORMAL_SPEED = math.random(300,350)
+local randNORMAL_SPEED = math.random(100,250)
 local randNORMAL_ACCERATION = math.random(550,600)
 local Config = {
 	-- Base driving
-	MAX_STEERING_ANGLE = 40,
+	MAX_STEERING_ANGLE = 25,
 	NORMAL_SPEED = randNORMAL_SPEED,
 	NORMAL_ACCELERATION = randNORMAL_ACCERATION,
 
 	-- Steering purchase
-	STEERING_LIMIT = 40,
+	STEERING_LIMIT = 25,
 	OVER_LIMIT_MULTIPLIER = 15,
 	SLOWDOWN_AMOUNT = 400,
 
@@ -117,7 +116,7 @@ local Config = {
 
 	-- Reverse
 	REVERSE_SPEED_THRESHOLD = 10,
-	REVERSE_TIME_THRESHOLD = 1,
+	REVERSE_TIME_THRESHOLD = 3,
 	REVERSE_DURATION = 0.5,
 	REVERSE_SPEED = 100,
 }
@@ -193,9 +192,9 @@ end
 
 -- Helper: Chat message
 local function chat(message)
-	--pcall(function()
-		--ChatService:Chat(Head,message, Enum.ChatColor.White)
-	--end)
+	pcall(function()
+	ChatService:Chat(Head,message, Enum.ChatColor.White)
+	end)
 end
 
 -- Chat message tables with random options
@@ -293,18 +292,19 @@ end
 -- Speed control
 local function setSpeed(speed)
 	RearRightDrivingHinge.AngularVelocity = -speed
-	RearLeftDrivingHinge.AngularVelocity = -speed
+	RearLeftDrivingHinge.AngularVelocity = speed
 	RearRightDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
 	RearLeftDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
+	--VehicleSeat.Throttle = 1
 end
 
 -- Steering control
 local function steer(angle)
+	angle = angle/20
 	angle = math.clamp(angle, -Config.MAX_STEERING_ANGLE, Config.MAX_STEERING_ANGLE)
-	FrontLeftSteeringHinge.LowerAngle = angle
-	FrontLeftSteeringHinge.UpperAngle = angle
-	FrontRightSteeringHinge.LowerAngle = angle
-	FrontRightSteeringHinge.UpperAngle = angle
+	FrontLeftSteeringHinge.TargetPosition = angle
+	--FrontRightSteeringHinge.LowerAngle = angle
+	--FrontRightSteeringHinge.UpperAngle = angle
 end
 
 -- Calculate steering angle to target
@@ -517,7 +517,8 @@ end)
 -- Main driving update
 local function updateDriving()
 	if not isSeated then return false end
-
+	RearLeftDrivingHinge.LimitsEnabled = false
+	RearRightDrivingHinge.LimitsEnabled = false
 	local nextCheckpoint = Checkpoints[currentCheckpointIndex]
 	local nextCheckpointNumber = getEffectiveCheckpointNumber(currentCheckpointIndex)
 
@@ -554,10 +555,10 @@ local function updateDriving()
 			steeringAngle = -forwardAngle -- Invert steering
 
 			-- Set reverse speed
-			RearRightDrivingHinge.AngularVelocity = Config.REVERSE_SPEED -- Positive for reverse
-			RearLeftDrivingHinge.AngularVelocity = Config.REVERSE_SPEED
-			RearRightDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
-			RearLeftDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
+			--RearRightDrivingHinge.AngularVelocity = Config.REVERSE_SPEED -- Positive for reverse
+			--RearLeftDrivingHinge.AngularVelocity = Config.REVERSE_SPEED
+			--RearRightDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
+			--RearLeftDrivingHinge.MotorMaxAcceleration = Config.NORMAL_ACCELERATION
 
 			steer(steeringAngle)
 			return true
@@ -663,7 +664,7 @@ local function updateDriving()
 						PursuitData.isActive = false
 
 						-- Connect to rival's steering to copy it
-						local rivalSteeringHinge = DiveData.targetKart:FindFirstChild("FrontRightSteeringHinge")
+						local rivalSteeringHinge = DiveData.targetKart.Steering:FindFirstChild("SteeringRack")
 						if rivalSteeringHinge then
 							DiveData.steeringConnection = rivalSteeringHinge:GetPropertyChangedSignal("UpperAngle"):Connect(function()
 								if DiveData.isActive then
@@ -757,7 +758,7 @@ while true do
 	if #Checkpoints == 0 then
 		warn("No checkpoints found!")
 		break
-		
+
 	end
 
 	updateDriving()
